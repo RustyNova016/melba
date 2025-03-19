@@ -1,9 +1,10 @@
 use crate::metrics::Metrics;
+use crate::models::musicbrainz_db::EditData;
+use crate::models::musicbrainz_db::EditNote;
 use crate::poller::utils::{
     extract_url_from_edit_data, extract_url_from_edit_note, save_url_to_internet_archive_urls,
 };
 use log::{info, warn};
-use mb_rs::schema::{EditData, EditNote};
 use sqlx::{Error, PgPool};
 
 /// Function which runs on each poll and thus is responsible for:

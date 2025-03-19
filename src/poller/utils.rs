@@ -1,7 +1,8 @@
+use crate::models::musicbrainz_db::EditData;
+use crate::models::musicbrainz_db::EditNote;
 use crate::poller::edit_types::remove_relationship::RemoveRelationship;
 use crate::structs::last_unprocessed_row::LastUnprocessedRow;
 use linkify::{LinkFinder, LinkKind};
-use mb_rs::schema::{EditData, EditNote};
 use serde_json::{json, Value};
 use sqlx::types::JsonValue;
 use sqlx::{Error, PgPool};
