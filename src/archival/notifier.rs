@@ -2,59 +2,72 @@ use crate::archival::utils::{get_first_id_to_start_notifier_from, is_row_exists}
 use log::{debug, info};
 use sqlx::{Error, PgPool};
 
+/// Keeps the current cursor of the `internet_archive_urls` table and notify the archiver's listener
+/// when new urls are available to process
 pub struct Notifier {
+    /// Notify from this row in the table `internet_archive_urls`
     start_notifier_from: Option<i32>,
+
+    /// Database pool
     pool: PgPool,
 }
 
 impl Notifier {
     pub async fn new(pool: PgPool) -> Notifier {
-        let start_notifier_from = get_first_id_to_start_notifier_from(pool.clone()).await;
-        if start_notifier_from.is_some() {
-            info!("[NOTIFIER] starts from : {}", start_notifier_from.unwrap());
-        }
+        let start_notifier_from = get_first_id_to_start_notifier_from(pool.clone())
+            .await
+            .inspect(|id| info!("[NOTIFIER] Starting from row id: {id}"));
+
         Notifier {
             start_notifier_from,
             pool,
         }
     }
 
-    ///`notify` function is called everytime we want to send the URLs from `internet_archive_urls` table to the `listener` task,
-    /// which archives the URL through network request using WayBack Machine API
+    /// Send a notification to the archiver's listener with the current row using `pg_notify`.
     pub async fn notify(&mut self) -> Result<(), Error> {
-        if self.start_notifier_from.is_some() {
-            let pool = self.pool.clone();
-            sqlx::query("SELECT external_url_archiver.notify_archive_urls($1)")
-                .bind(self.start_notifier_from)
-                .execute(&pool)
-                .await?;
-            info!(
-                "[NOTIFIER] Adding internet_archive_urls id {} to the archive_urls channel",
-                self.start_notifier_from.unwrap()
-            );
+        match self.start_notifier_from {
+            Some(current_id) => {
+                let pool = self.pool.clone();
 
-            //Case: If the notifier reached the end of the row, and couldn't find any unarchived row in Internet Archives URL table, we will not increment the self.start_notifier_from count
-            if is_row_exists(&pool, self.start_notifier_from.unwrap()).await {
-                self.start_notifier_from = Some(self.start_notifier_from.unwrap() + 1);
+                // Send a notification using a postgreSQL function
+                sqlx::query("SELECT external_url_archiver.notify_archive_urls($1)")
+                    .bind(current_id)
+                    .execute(&pool)
+                    .await?;
+
+                info!("[NOTIFIER] Adding internet_archive_urls id {current_id} to the archive_urls channel");
+
+                //Case: If the notifier reached the end of the row, and couldn't find any unarchived row in Internet Archives URL table, we will not increment the self.start_notifier_from count
+                if is_row_exists(&pool, current_id).await {
+                    //TODO: BUG! Having a field serial does NOT garanty that id + 1 exists, and is the last row of the table!
+                    // (Ex: Delete and upsert disrupting the flow).
+                    // This is saved by `get_first_id_to_start_notifier_from()` but still bad!
+                    self.start_notifier_from = Some(current_id + 1);
+                }
+                Ok(())
             }
-            Ok(())
-        } else {
-            //Case: It could be that there is no URL in InternetArchiveURL table when we call `notify`, so we check for the id here, to start notifier from it in the next notify call
-            debug!("[NOTIFIER] No row detected to archive, checking again");
-            self.start_notifier_from = get_first_id_to_start_notifier_from(self.pool.clone()).await;
-            Ok(())
+            None => {
+                // We called `notify` without having a current row as our cursor
+                // So we go fetch the next unarchived row (if it exists)
+                debug!("[NOTIFIER] Tried to notify, but no row is set to archive. Searching for a new row");
+                self.start_notifier_from =
+                    get_first_id_to_start_notifier_from(self.pool.clone()).await;
+                Ok(())
+            }
         }
     }
 
-    /// Checks if the row to begin notifying from is present in `internet_archive_urls`
+    /// Return true if there's a row to notify, and thus need to call [`notify`]
     pub async fn should_notify(&mut self) -> bool {
-        if self.start_notifier_from.is_some() {
-            is_row_exists(&self.pool, self.start_notifier_from.unwrap()).await
-        } else {
-            true
+        match self.start_notifier_from {
+            Some(id) => is_row_exists(&self.pool, id).await,
+            None => true,
         }
     }
+
+    //TODO: Silence clippy warning when removing the underscore. Require: Moving integration tests to 
     pub fn _get_notifier_index(&self) -> i32 {
-        self.start_notifier_from.unwrap()
+        self.start_notifier_from.unwrap() //TODO: BAD! It's only for tests, but may be used in actual code!
     }
 }

@@ -38,8 +38,11 @@ pub async fn get_first_id_to_start_notifier_from(pool: PgPool) -> Option<i32> {
              LIMIT 1
              "#,
     )
+    //TODO: BUG! Database may return none!
     .fetch_one(&pool)
     .await;
+
+    //TODO: BUG! Ignoring the error!
     last_row_result.map(|last_row| last_row.id).ok()
 }
 
@@ -70,11 +73,13 @@ pub async fn inc_archive_request_retry_count(pool: &PgPool, id: i32) -> Result<(
     Ok(())
 }
 
+/// Return true if a row with a specific ID exist in the table `internet_archive_urls`
 pub async fn is_row_exists(pool: &PgPool, row_id: i32) -> bool {
     let query = r#"
         SELECT 1 FROM external_url_archiver.internet_archive_urls
         WHERE id = $1;
     "#;
+
     let is_row_exists_res = sqlx::query_as::<_, (i32,)>(query)
         .bind(row_id)
         .fetch_one(pool)
@@ -82,6 +87,7 @@ pub async fn is_row_exists(pool: &PgPool, row_id: i32) -> bool {
     match is_row_exists_res {
         Ok(_) => true,
         Err(error) => {
+            //TODO: BUG! The returned error does NOT *ONLY* indicate a missing row. It could indicate an error from the database and shouldn't be shrugged off!
             debug!(
                 "[NOTIFIER] No new row to notify in internet_archive_urls. Current id: {}. Reason: {:?}",
                 row_id,
