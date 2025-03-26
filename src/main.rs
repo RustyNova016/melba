@@ -7,7 +7,6 @@ mod archival;
 mod cli;
 mod models;
 mod poller;
-mod structs;
 
 mod configuration;
 mod metrics;
