@@ -83,7 +83,7 @@ async fn spawn_notification_task(db_pool: PgPool) -> JoinHandle<()> {
 /// ⚠️ This must be awaited twice. Once to get the `JoinHandle`, and a second to start the task
 async fn spawn_archiver_task(db_pool: PgPool) -> JoinHandle<()> {
     tokio::spawn(async move {
-        archival::listener::listen(db_pool)
+        archival::archiver::listen(db_pool)
             .await
             .unwrap_or_else(|e| {
                 sentry::capture_error(&e);

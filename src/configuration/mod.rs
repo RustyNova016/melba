@@ -4,6 +4,7 @@ use env_logger::Builder;
 use log::LevelFilter;
 use once_cell::sync::Lazy;
 use serde::Deserialize;
+use core::time::Duration;
 use std::env;
 use std::io::Write;
 
@@ -16,6 +17,8 @@ pub struct WaybackMachineApi {
     pub mysecret: String,
     pub save_endpoint_url: String,
     pub status_endpoint_url: String,
+    pub save_rate_limit: u32,
+    pub status_rate_limit: u32,
 }
 
 #[derive(Debug, Deserialize)]
@@ -39,6 +42,19 @@ pub struct NotifyTask {
 pub struct ListenTask {
     pub listen_interval: u64,
     pub sleep_status_interval: u64,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ArchivalTask {
+    pub job_interval: u64,
+    pub worker_count: u64,
+    pub max_retry: u64
+}
+
+#[derive(Debug, Deserialize)]
+pub struct StatusWatchTask {
+    pub job_interval: u64,
+    pub worker_count: u64,
 }
 
 #[derive(Debug, Deserialize)]
@@ -70,6 +86,8 @@ pub struct Settings {
     pub poller_task: PollerTask,
     pub notify_task: NotifyTask,
     pub listen_task: ListenTask,
+    pub archival_task: ArchivalTask,
+    pub status_watch_task: StatusWatchTask,
     pub sentry: Sentry,
     pub database: Database,
     pub logs: Logs,
@@ -115,5 +133,17 @@ impl Settings {
 
         builder.format(|buf, record| writeln!(buf, "[{}] - {}", record.level(), record.args()));
         builder.init();
+    }
+}
+
+impl RetryTask {
+    pub fn get_retry_interval(&self) -> Duration {
+        Duration::new(SETTINGS.retry_task.retry_interval, 0)
+    }
+}
+
+impl ArchivalTask {
+    pub fn get_job_interval(&self) -> Duration {
+        Duration::new(self.job_interval, 0)
     }
 }

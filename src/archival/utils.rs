@@ -159,6 +159,7 @@ pub async fn schedule_status_check(
         ))
         .await;
         let archival_status_response = make_archival_status_request(job_id.as_str()).await?;
+        
         if archival_status_response.status == "success" {
             set_status_with_message(
                 pool,
@@ -167,11 +168,13 @@ pub async fn schedule_status_check(
                 archival_status_response.status.as_str(),
             )
             .await?;
+
             metrics.record_archival_status("success archival").await;
             info!(
                 "[LISTENER] STATUS CHECK: internet_archive_urls id: {} and job_id {} archived successfully",
                 id, job_id
             );
+
             return Ok(());
         } else if attempt == 3 {
             let status = archival_status_response.status;

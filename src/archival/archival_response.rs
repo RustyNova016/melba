@@ -2,6 +2,13 @@ use serde::Deserialize;
 use std::fmt;
 
 #[derive(Deserialize, Debug, PartialEq)]
+pub enum ArchiveUrlResponse {
+    Ok(ArchivalResponse),
+    Err(ArchivalErrorResponse),
+    ErrStr(String)
+}
+
+#[derive(Deserialize, Debug, PartialEq)]
 pub struct ArchivalResponse {
     pub url: String,
     pub job_id: String,

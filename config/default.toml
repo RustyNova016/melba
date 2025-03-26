@@ -5,8 +5,10 @@ warning = true
 info = true
 
 [retry_task]
+# How long to wait between retries
 retry_interval = 86400 # 60*60*24 seconds
-select_limit  = 10
+select_limit  = 10 # TODO: Remove
+# Remove the row if it has been more than X elapsed seconds since its creation
 allow_remove_row_after = 86400
 
 [poller_task]
@@ -19,6 +21,28 @@ notify_interval = 10
 listen_interval = 5
 sleep_status_interval = 120
 
+# Takes pending urls and send a request to IA to archive them
+[archival_task]
+# The minimum interval of time in seconds before another url start getting archived
+job_interval = 15
+# The amount of concurent archival requests to create
+worker_count = 1
+# The amount of times an url can be retried
+max_retry = 3
+
+# Watch over the pending archivals
+[status_watch_task]
+# The minimum interval of time in seconds before another archival start getting watched
+job_interval = 15
+# The amount of concurent watchers to create. A watcher will follow ONLY one archival request until it ends.
+worker_count = 50
+
 [wayback_machine_api]
 save_endpoint_url = "http://web.archive.org/save"
 status_endpoint_url =  "http://web.archive.org/save/status"
+
+# How many save requests to allow per minute across all workers
+save_rate_limit = 1
+
+# How many status requests to allow per minute across all workers
+status_rate_limit = 4

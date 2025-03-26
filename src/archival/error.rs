@@ -20,4 +20,10 @@ pub enum ArchivalError {
 
     #[error("HTML Response: {0}")]
     HtmlResponse(String),
+
+    #[error("Wayback Machine returned an error:\n{0:?}")]
+    WaybackMachineErr(ArchivalErrorResponse),
+
+    #[error("Wayback Machine returned an error:\n{0}")]
+    WaybackMachineErrStr(String),
 }

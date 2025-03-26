@@ -1,6 +1,6 @@
 use melba::archival;
 use melba::archival::error::ArchivalError;
-use melba::archival::listener::handle_payload;
+use melba::archival::archiver::handle_payload;
 use melba::archival::notifier::Notifier;
 use melba::models::melba::internet_archive_urls::InternetArchiveUrl;
 use sqlx::postgres::PgListener;
