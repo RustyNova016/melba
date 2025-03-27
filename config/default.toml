@@ -18,3 +18,7 @@ notify_interval = 10
 [listen_task]
 listen_interval = 5
 sleep_status_interval = 120
+
+[wayback_machine_api]
+save_endpoint_url = "http://web.archive.org/save"
+status_endpoint_url =  "http://web.archive.org/save/status"

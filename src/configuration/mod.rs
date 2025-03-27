@@ -14,6 +14,8 @@ pub static SETTINGS: Lazy<Settings> =
 pub struct WaybackMachineApi {
     pub myaccesskey: String,
     pub mysecret: String,
+    pub save_endpoint_url: String,
+    pub status_endpoint_url: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -79,8 +81,12 @@ impl Settings {
         let run_mode = env::var("RUN_MODE").unwrap_or_else(|_| "development".into());
         let config = Config::builder()
             .add_source(File::with_name("config/default"))
-            .add_source(File::with_name(&format!("config/{}", run_mode)).required(false))
-            .build()?;
+            .add_source(File::with_name(&format!("config/{}", run_mode)).required(false));
+
+        #[cfg(test)]
+        let config = config.add_source(File::with_name("config/testing").required(false));
+
+        let config = config.build()?;
         config.try_deserialize()
     }
 

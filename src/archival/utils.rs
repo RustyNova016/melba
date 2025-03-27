@@ -14,16 +14,6 @@ use sqlx::{Error, PgPool};
 use std::time::Duration;
 use tokio::time;
 
-#[cfg(not(test))]
-const SAVE_ENDPOINT_URL: &str = "http://web.archive.org/save";
-#[cfg(not(test))]
-const STATUS_ENDPOINT_URL: &str = "http://web.archive.org/save/status";
-
-#[cfg(test)]
-const SAVE_ENDPOINT_URL: &str = "http://127.0.0.1:1234/save";
-#[cfg(test)]
-const STATUS_ENDPOINT_URL: &str = "http://127.0.0.1:1235/status";
-
 ///This function is used to find the row in internet_archive_urls from where we can start the archival task
 /// The notify function will start picking URLs from the returned row id
 /// - returns `None` if no rows are present in the table
@@ -102,7 +92,7 @@ pub async fn is_row_exists(pool: &PgPool, row_id: i32) -> bool {
 pub async fn make_archival_network_request(url: &str) -> Result<ArchivalResponse, ArchivalError> {
     let client = &REQWEST_CLIENT;
     let response = client
-        .post(SAVE_ENDPOINT_URL)
+        .post(&SETTINGS.wayback_machine_api.save_endpoint_url)
         .body(format!("url={}", url))
         .send()
         .await?;
@@ -125,7 +115,7 @@ pub async fn make_archival_status_request(
 ) -> Result<ArchivalStatusResponse, ArchivalError> {
     let client = &REQWEST_CLIENT;
     let response = client
-        .post(STATUS_ENDPOINT_URL)
+        .post(&SETTINGS.wayback_machine_api.status_endpoint_url)
         .body(format!("job_id={}", job_id))
         .send()
         .await?;
