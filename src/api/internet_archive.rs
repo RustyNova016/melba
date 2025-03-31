@@ -11,6 +11,7 @@ use governor::RateLimiter;
 
 use crate::archival::archival_response::ArchivalErrorResponse;
 use crate::archival::archival_response::ArchivalResponse;
+use crate::archival::archival_response::ArchivalStatusResponse;
 use crate::archival::client::REQWEST_CLIENT;
 use crate::archival::error::ArchivalError;
 use crate::configuration::SETTINGS;
@@ -24,9 +25,19 @@ pub const IA_SAVE_RATELIMIT: LazyCell<
     )
 });
 
-///Handles the network request to archive the URL
+pub const IA_STATUS_RATELIMIT: LazyCell<
+    RateLimiter<NotKeyed, InMemoryState, QuantaClock, NoOpMiddleware<QuantaInstant>>,
+> = LazyCell::new(|| {
+    RateLimiter::direct(
+        Quota::per_minute(NonZeroU32::new(SETTINGS.wayback_machine_api.status_rate_limit).unwrap())
+            .allow_burst(NonZeroU32::new(1).unwrap()),
+    )
+});
+
+/// Handles the network request to archive the URL
 pub async fn archive_url_in_ia(url: &str) -> Result<ArchivalResponse, ArchivalError> {
     IA_SAVE_RATELIMIT.until_ready().await;
+
     let response = REQWEST_CLIENT
         .post(&SETTINGS.wayback_machine_api.save_endpoint_url)
         .body(format!("url={}", url))
@@ -44,4 +55,19 @@ pub async fn archive_url_in_ia(url: &str) -> Result<ArchivalResponse, ArchivalEr
     } else {
         Err(ArchivalError::WaybackMachineErrStr(res))
     }
+}
+
+// Handles the network request to get the status of the archival
+pub async fn archiving_job_status(job_id: &str) -> Result<ArchivalStatusResponse, ArchivalError> {
+    IA_STATUS_RATELIMIT.until_ready().await;
+
+    let response = REQWEST_CLIENT
+        .post(&SETTINGS.wayback_machine_api.status_endpoint_url)
+        .body(format!("job_id={}", job_id))
+        .send()
+        .await?;
+
+    let response_text = response.text().await?;
+
+    ArchivalStatusResponse::from_body(response_text)
 }

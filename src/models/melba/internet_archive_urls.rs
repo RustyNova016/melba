@@ -1,4 +1,3 @@
-use ::chrono::Duration;
 use chrono::DateTime;
 use chrono::Utc;
 use serde::Deserialize;
@@ -132,6 +131,27 @@ impl InternetArchiveUrl {
         Ok(())
     }
 
+        /// Set a job as waiting status.
+    pub async fn to_archived(
+        &mut self,
+        conn: &PgPool,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            "
+            UPDATE external_url_archiver.internet_archive_urls 
+            SET status = 'Archived', 
+            WHERE id = $1
+        ",
+        )
+        .bind(self.id)
+        .execute(conn)
+        .await?;
+
+        self.status = ArchivalStatus::Archived;
+
+        Ok(())
+    }
+
     /// Set a job as errored.
     pub async fn to_errored(&mut self, conn: &PgPool) -> Result<(), sqlx::Error> {
         sqlx::query(
@@ -151,6 +171,8 @@ impl InternetArchiveUrl {
         .await?;
 
         self.status = ArchivalStatus::Errored;
+        self.try_count += 1;
+        self.retry_after += SETTINGS.retry_task.get_retry_interval();
 
         Ok(())
     }
@@ -171,8 +193,22 @@ impl InternetArchiveUrl {
         .execute(conn)
         .await?;
 
-        self.status = ArchivalStatus::Errored;
+        self.status = ArchivalStatus::Failed;
 
         Ok(())
+    }
+
+    pub async fn get_pending_jobs(
+        conn: &PgPool,
+    ) -> Result<Vec<Self>, sqlx::Error>{
+        sqlx::query_as(
+            "
+            SELECT DISTINCT ON (id) *
+            FROM external_url_archiver.internet_archive_urls
+            WHERE 
+                status = 'WaitingStatus'
+        ",
+        )
+        .fetch_all(conn).await
     }
 }

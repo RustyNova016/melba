@@ -55,6 +55,7 @@ pub struct ArchivalTask {
 pub struct StatusWatchTask {
     pub job_interval: u64,
     pub worker_count: u64,
+    pub max_retry: u64
 }
 
 #[derive(Debug, Deserialize)]
@@ -143,6 +144,12 @@ impl RetryTask {
 }
 
 impl ArchivalTask {
+    pub fn get_job_interval(&self) -> Duration {
+        Duration::new(self.job_interval, 0)
+    }
+}
+
+impl StatusWatchTask {
     pub fn get_job_interval(&self) -> Duration {
         Duration::new(self.job_interval, 0)
     }

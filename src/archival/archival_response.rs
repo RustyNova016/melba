@@ -1,11 +1,13 @@
 use serde::Deserialize;
 use std::fmt;
 
+use crate::archival::error::ArchivalError;
+
 #[derive(Deserialize, Debug, PartialEq)]
 pub enum ArchiveUrlResponse {
     Ok(ArchivalResponse),
     Err(ArchivalErrorResponse),
-    ErrStr(String)
+    ErrStr(String),
 }
 
 #[derive(Deserialize, Debug, PartialEq)]
@@ -35,7 +37,7 @@ pub struct ArchivalStatusResponse {
 pub struct ArchivalStatusErrorResponse {
     pub job_id: String,
     pub message: Option<String>,
-    pub status_ext: Option<String>,
+    pub status_ext: String,
     pub status: Option<String>,
 }
 
@@ -60,5 +62,22 @@ impl fmt::Debug for ArchivalStatusErrorResponse {
             .field("status_ext", &self.status_ext.as_deref().unwrap_or("")) // Unwrap Option<String> or use an empty string
             .field("status", &self.status.as_deref().unwrap_or("")) // Unwrap Option<String> or use an empty string
             .finish()
+    }
+}
+
+impl ArchivalStatusResponse {
+    pub fn from_body(text: String) -> Result<ArchivalStatusResponse, ArchivalError> {
+        // First, try to deserialize as an Ok response
+        if let Ok(value) = serde_json::from_str::<ArchivalStatusResponse>(&text) {
+            if value.status != "error" {
+                return Ok(value);
+            }
+        }
+
+        if let Ok(err) = serde_json::from_str::<ArchivalStatusErrorResponse>(&text) {
+            return Err(ArchivalError::StatusRequestErrorResponse(err));
+        }
+
+        Err(ArchivalError::HtmlResponse(text))
     }
 }

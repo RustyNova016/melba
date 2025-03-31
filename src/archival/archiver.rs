@@ -20,12 +20,13 @@ pub async fn run_archiver_task(conn: &PgPool) -> Result<(), crate::Error> {
     let url_stream = url_stream
         .map_ok(|url| process_url(conn, url))
         .extract_future_ok()
-        .buffer_unordered(SETTINGS.archival_task.worker_count as usize);
+        .buffer_unordered(SETTINGS.archival_task.worker_count as usize)
+        .flatten_result_ok();
 
     pin_mut!(url_stream);
 
     // Run the archiver
-    while let Some(_) = url_stream.try_next().await? {}
+    while let Some(_t) = url_stream.try_next().await? {}
 
     Ok(())
 }
@@ -33,7 +34,7 @@ pub async fn run_archiver_task(conn: &PgPool) -> Result<(), crate::Error> {
 /// Create a stream of urls to archive
 fn get_archiver_stream(
     conn: PgPool,
-) -> impl Stream<Item = Result<InternetArchiveUrl, sqlx::Error>> {
+) -> impl Stream<Item = Result<InternetArchiveUrl, crate::Error>> {
     try_fn_stream(async move |emitter| {
         let mut interval = time::interval(SETTINGS.archival_task.get_job_interval());
 
@@ -55,13 +56,13 @@ fn get_archiver_stream(
 }
 
 /// Process an url element
-async fn process_url(conn: &PgPool, mut url: InternetArchiveUrl) {
+async fn process_url(conn: &PgPool, mut url: InternetArchiveUrl) -> Result<(), crate::Error> {
     let metrics = Metrics::new().await;
     info!("[Archiver] Processing url id `{}`", url.id);
 
     // We check if the url hasn't been retried multiple times already
     if (url.try_count as u64) < SETTINGS.archival_task.max_retry {
-        request_archiving(conn, &mut url).await;
+        request_archiving(conn, &mut url).await?;
     } else {
         warn!(
             "[Archiver] Too many retries for url: id {}, URL: {}, reason: {}",
@@ -70,6 +71,8 @@ async fn process_url(conn: &PgPool, mut url: InternetArchiveUrl) {
             url.status_message.as_ref().unwrap_or(&"(None)".to_string())
         );
     }
+
+    Ok(())
 }
 
 /// Request the url archival for IA. Save the job id if successful

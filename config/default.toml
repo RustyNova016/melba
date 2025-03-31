@@ -36,6 +36,8 @@ max_retry = 3
 job_interval = 15
 # The amount of concurent watchers to create. A watcher will follow ONLY one archival request until it ends.
 worker_count = 50
+# The amount of times the task can try fetching the url
+max_retry = 3
 
 [wayback_machine_api]
 save_endpoint_url = "http://web.archive.org/save"
