@@ -49,6 +49,7 @@ pub struct InternetArchiveUrl {
 
 impl InternetArchiveUrl {
     /// Return true if a row with the provided row id is in the database
+    #[expect(dead_code)]
     pub async fn row_exist(conn: &PgPool, row_id: i32) -> Result<bool, sqlx::Error> {
         sqlx::query_scalar(
             "
@@ -87,7 +88,7 @@ impl InternetArchiveUrl {
     /// Set a job as processing.
     ///
     /// This also clears the job id to prevent ambiguity whether it's from a previous try or the current one
-    pub async fn to_processing(&mut self, conn: &PgPool) -> Result<(), sqlx::Error> {
+    pub async fn set_processing(&mut self, conn: &PgPool) -> Result<(), sqlx::Error> {
         sqlx::query(
             "
             UPDATE external_url_archiver.internet_archive_urls 
@@ -107,7 +108,7 @@ impl InternetArchiveUrl {
     }
 
     /// Set a job as waiting status.
-    pub async fn to_waiting_status(
+    pub async fn set_waiting_status(
         &mut self,
         conn: &PgPool,
         job_id: String,
@@ -131,11 +132,8 @@ impl InternetArchiveUrl {
         Ok(())
     }
 
-        /// Set a job as waiting status.
-    pub async fn to_archived(
-        &mut self,
-        conn: &PgPool,
-    ) -> Result<(), sqlx::Error> {
+    /// Set a job as waiting status.
+    pub async fn set_archived(&mut self, conn: &PgPool) -> Result<(), sqlx::Error> {
         sqlx::query(
             "
             UPDATE external_url_archiver.internet_archive_urls 
@@ -153,7 +151,7 @@ impl InternetArchiveUrl {
     }
 
     /// Set a job as errored.
-    pub async fn to_errored(&mut self, conn: &PgPool) -> Result<(), sqlx::Error> {
+    pub async fn set_errored(&mut self, conn: &PgPool) -> Result<(), sqlx::Error> {
         sqlx::query(
             "
             UPDATE external_url_archiver.internet_archive_urls 
@@ -178,7 +176,7 @@ impl InternetArchiveUrl {
     }
 
     /// Set a job as failed.
-    pub async fn to_failed(&mut self, conn: &PgPool) -> Result<(), sqlx::Error> {
+    pub async fn set_failed(&mut self, conn: &PgPool) -> Result<(), sqlx::Error> {
         sqlx::query(
             "
             UPDATE external_url_archiver.internet_archive_urls 
@@ -198,9 +196,7 @@ impl InternetArchiveUrl {
         Ok(())
     }
 
-    pub async fn get_pending_jobs(
-        conn: &PgPool,
-    ) -> Result<Vec<Self>, sqlx::Error>{
+    pub async fn get_pending_jobs(conn: &PgPool) -> Result<Vec<Self>, sqlx::Error> {
         sqlx::query_as(
             "
             SELECT DISTINCT ON (id) *
@@ -209,6 +205,7 @@ impl InternetArchiveUrl {
                 status = 'WaitingStatus'
         ",
         )
-        .fetch_all(conn).await
+        .fetch_all(conn)
+        .await
     }
 }

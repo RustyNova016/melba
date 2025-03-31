@@ -41,16 +41,12 @@ fn get_archiver_stream(
         loop {
             let res = InternetArchiveUrl::find_new_job(&conn, None).await?;
 
-            match res {
-                Some(mut url) => {
-                    url.to_processing(&conn).await?;
-                    emitter.emit(url).await;
-                }
-
-                None => {}
+            if let Some(mut url) = res {
+                url.set_processing(&conn).await?;
+                emitter.emit(url).await;
             }
 
-            interval.tick();
+            interval.tick().await;
         }
     })
 }
@@ -87,7 +83,7 @@ async fn request_archiving(
                 "[Archiver] Request successful | url id: {} url: {}, job id: {}",
                 url.id, url.url, response.job_id
             );
-            url.to_waiting_status(conn, response.job_id).await?;
+            url.set_waiting_status(conn, response.job_id).await?;
         }
 
         // Uh oh, error. Set the url as errored,
@@ -98,7 +94,7 @@ async fn request_archiving(
             );
 
             //TODO: Check whether the error is from this specific URL (Set as errored), or something external (return the error to be dealt higher up).
-            url.to_errored(conn).await?;
+            url.set_errored(conn).await?;
         }
     }
 

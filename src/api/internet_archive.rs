@@ -1,5 +1,5 @@
-use core::cell::LazyCell;
 use core::num::NonZeroU32;
+use std::sync::LazyLock;
 
 use governor::clock::QuantaClock;
 use governor::clock::QuantaInstant;
@@ -16,18 +16,18 @@ use crate::archival::client::REQWEST_CLIENT;
 use crate::archival::error::ArchivalError;
 use crate::configuration::SETTINGS;
 
-pub const IA_SAVE_RATELIMIT: LazyCell<
+pub static IA_SAVE_RATELIMIT: LazyLock<
     RateLimiter<NotKeyed, InMemoryState, QuantaClock, NoOpMiddleware<QuantaInstant>>,
-> = LazyCell::new(|| {
+> = LazyLock::new(|| {
     RateLimiter::direct(
         Quota::per_minute(NonZeroU32::new(SETTINGS.wayback_machine_api.save_rate_limit).unwrap())
             .allow_burst(NonZeroU32::new(1).unwrap()),
     )
 });
 
-pub const IA_STATUS_RATELIMIT: LazyCell<
+pub static IA_STATUS_RATELIMIT: LazyLock<
     RateLimiter<NotKeyed, InMemoryState, QuantaClock, NoOpMiddleware<QuantaInstant>>,
-> = LazyCell::new(|| {
+> = LazyLock::new(|| {
     RateLimiter::direct(
         Quota::per_minute(NonZeroU32::new(SETTINGS.wayback_machine_api.status_rate_limit).unwrap())
             .allow_burst(NonZeroU32::new(1).unwrap()),

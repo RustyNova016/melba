@@ -1,4 +1,5 @@
-use core::cell::LazyCell;
+use std::sync::Arc;
+use std::sync::LazyLock;
 
 use async_fn_stream::try_fn_stream;
 use futures::pin_mut;
@@ -9,7 +10,6 @@ use log::error;
 use log::info;
 use log::warn;
 use sqlx::PgPool;
-use streamies::Streamies;
 use streamies::TryStreamies as _;
 use tokio::sync::Mutex;
 use tokio::time;
@@ -18,7 +18,6 @@ use crate::api::internet_archive::archiving_job_status;
 use crate::archival::archival_response::ArchivalStatusErrorResponse;
 use crate::archival::archival_response::ArchivalStatusResponse;
 use crate::archival::error::ArchivalError;
-use crate::archival::retry;
 use crate::archival::utils::check_if_permanent_error;
 use crate::configuration::SETTINGS;
 use crate::models::melba::internet_archive_urls::InternetArchiveUrl;
@@ -40,7 +39,8 @@ pub async fn run_status_watcher(conn: &PgPool) -> Result<(), ArchivalError> {
     Ok(())
 }
 
-const LOCKS: LazyCell<Mutex<Vec<String>>> = LazyCell::new(|| Mutex::new(Vec::new()));
+static LOCKS: LazyLock<Arc<Mutex<Vec<String>>>> =
+    LazyLock::new(|| Arc::new(Mutex::new(Vec::new())));
 
 /// Return true if the url is locked and a watcher shouldn't be spawned for it
 async fn is_url_locked(url: &InternetArchiveUrl) -> bool {
@@ -82,8 +82,8 @@ async fn watch_status(conn: &PgPool, mut url: InternetArchiveUrl) -> Result<(), 
         return Ok(());
     };
 
-    for attempt in 0..SETTINGS.status_watch_task.max_retry {
-        if check_status(conn, &mut url, &job_id, attempt).await? {
+    for _ in 0..SETTINGS.status_watch_task.max_retry {
+        if check_status(conn, &mut url, &job_id).await? {
             LOCKS.lock().await.retain(|lock| lock != &url.url);
 
             return Ok(());
@@ -91,7 +91,7 @@ async fn watch_status(conn: &PgPool, mut url: InternetArchiveUrl) -> Result<(), 
     }
 
     // If we haven't succeeded or errored out by the last retry, we error out
-    url.to_errored(conn).await?;
+    url.set_errored(conn).await?;
 
     warn!(
         "[Status watcher] Max retries for url status | id: {} | url: {}",
@@ -110,12 +110,11 @@ async fn check_status(
     conn: &PgPool,
     url: &mut InternetArchiveUrl,
     job_id: &str,
-    attempt: u64,
 ) -> Result<bool, ArchivalError> {
     let status = archiving_job_status(job_id).await;
 
     match status {
-        Ok(status) => handle_archival_response(conn, url, job_id, attempt, status).await,
+        Ok(status) => handle_archival_response(conn, url, status).await,
         Err(ArchivalError::StatusRequestErrorResponse(err)) => {
             handle_archival_error(conn, url, err).await
         }
@@ -126,24 +125,22 @@ async fn check_status(
 async fn handle_archival_response(
     conn: &PgPool,
     url: &mut InternetArchiveUrl,
-    job_id: &str,
-    attempt: u64,
     status: ArchivalStatusResponse,
 ) -> Result<bool, ArchivalError> {
     // Have we succeded?
     if status.status == "success" {
-        url.to_archived(conn).await?;
+        url.set_archived(conn).await?;
 
         info!(
             "[Status watcher] Url archived successfully | id: {} | url: {}",
             url.id, url.url
         );
 
-        return Ok(true);
+        Ok(true)
     }
     // Pending? Then we wait
     else if status.status == "pending" {
-        return Ok(false);
+        Ok(false)
     } else {
         // We recieved something unexpected. Error out and try again
         error!(
@@ -151,7 +148,7 @@ async fn handle_archival_response(
             status.status, url.id, url.url
         );
 
-        return Ok(false);
+        Ok(false)
     }
 }
 
@@ -162,9 +159,9 @@ async fn handle_archival_error(
 ) -> Result<bool, ArchivalError> {
     // We got an error! Let's check whether it's recoverable
     if check_if_permanent_error(&status.status_ext) {
-        url.to_failed(conn).await?;
+        url.set_failed(conn).await?;
     } else {
-        url.to_errored(conn).await?;
+        url.set_errored(conn).await?;
     }
 
     warn!(
@@ -172,5 +169,5 @@ async fn handle_archival_error(
         url.id, url.url, status.status_ext
     );
 
-    return Ok(true);
+    Ok(true)
 }

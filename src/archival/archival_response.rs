@@ -59,7 +59,7 @@ impl fmt::Debug for ArchivalStatusErrorResponse {
         f.debug_struct("Archival Status Error Response")
             .field("job_id", &self.job_id)
             .field("message", &self.message.as_deref().unwrap_or("")) // Unwrap Option<String> or use an empty string
-            .field("status_ext", &self.status_ext.as_deref().unwrap_or("")) // Unwrap Option<String> or use an empty string
+            .field("status_ext", &self.status_ext) // Unwrap Option<String> or use an empty string
             .field("status", &self.status.as_deref().unwrap_or("")) // Unwrap Option<String> or use an empty string
             .finish()
     }

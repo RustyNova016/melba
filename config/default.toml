@@ -14,13 +14,6 @@ allow_remove_row_after = 86400
 [poller_task]
 poll_interval = 10
 
-[notify_task]
-notify_interval = 10
-
-[listen_task]
-listen_interval = 5
-sleep_status_interval = 120
-
 # Takes pending urls and send a request to IA to archive them
 [archival_task]
 # The minimum interval of time in seconds before another url start getting archived

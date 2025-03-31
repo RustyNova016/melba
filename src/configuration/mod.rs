@@ -1,10 +1,10 @@
 use config::{Config, ConfigError, File};
+use core::time::Duration;
 use dotenv::dotenv;
 use env_logger::Builder;
 use log::LevelFilter;
 use once_cell::sync::Lazy;
 use serde::Deserialize;
-use core::time::Duration;
 use std::env;
 use std::io::Write;
 
@@ -23,39 +23,25 @@ pub struct WaybackMachineApi {
 
 #[derive(Debug, Deserialize)]
 pub struct RetryTask {
-    pub select_limit: i32,
     pub retry_interval: u64,
-    pub allow_remove_row_after: i64,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct PollerTask {
     pub poll_interval: u64,
 }
-
-#[derive(Debug, Deserialize)]
-pub struct NotifyTask {
-    pub notify_interval: u64,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct ListenTask {
-    pub listen_interval: u64,
-    pub sleep_status_interval: u64,
-}
-
 #[derive(Debug, Deserialize)]
 pub struct ArchivalTask {
     pub job_interval: u64,
     pub worker_count: u64,
-    pub max_retry: u64
+    pub max_retry: u64,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct StatusWatchTask {
     pub job_interval: u64,
     pub worker_count: u64,
-    pub max_retry: u64
+    pub max_retry: u64,
 }
 
 #[derive(Debug, Deserialize)]
@@ -85,8 +71,6 @@ pub struct Settings {
     pub wayback_machine_api: WaybackMachineApi,
     pub retry_task: RetryTask,
     pub poller_task: PollerTask,
-    pub notify_task: NotifyTask,
-    pub listen_task: ListenTask,
     pub archival_task: ArchivalTask,
     pub status_watch_task: StatusWatchTask,
     pub sentry: Sentry,
