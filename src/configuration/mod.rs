@@ -22,11 +22,6 @@ pub struct WaybackMachineApi {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct RetryTask {
-    pub retry_interval: u64,
-}
-
-#[derive(Debug, Deserialize)]
 pub struct PollerTask {
     pub poll_interval: u64,
 }
@@ -34,7 +29,9 @@ pub struct PollerTask {
 pub struct ArchivalTask {
     pub job_interval: u64,
     pub worker_count: u64,
-    pub max_retry: u64,
+    pub max_retry: i64,
+    pub retry_interval: u64,
+    pub allow_remove_row_after: i64,
 }
 
 #[derive(Debug, Deserialize)]
@@ -42,6 +39,12 @@ pub struct StatusWatchTask {
     pub job_interval: u64,
     pub worker_count: u64,
     pub max_retry: u64,
+    pub retry_interval: u64,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CleanupTask {
+    pub job_interval: u64,
 }
 
 #[derive(Debug, Deserialize)]
@@ -69,12 +72,16 @@ pub struct Logs {
 #[derive(Debug, Deserialize)]
 pub struct Settings {
     pub wayback_machine_api: WaybackMachineApi,
-    pub retry_task: RetryTask,
+    pub database: Database,
+
+    // Task settings
     pub poller_task: PollerTask,
     pub archival_task: ArchivalTask,
     pub status_watch_task: StatusWatchTask,
+    pub cleaner_task: CleanupTask,
+
+    // Log settings
     pub sentry: Sentry,
-    pub database: Database,
     pub logs: Logs,
 }
 
@@ -121,20 +128,24 @@ impl Settings {
     }
 }
 
-impl RetryTask {
-    pub fn get_retry_interval(&self) -> Duration {
-        Duration::new(SETTINGS.retry_task.retry_interval, 0)
-    }
-}
-
 impl ArchivalTask {
     pub fn get_job_interval(&self) -> Duration {
         Duration::new(self.job_interval, 0)
+    }
+
+    pub fn get_retry_interval(&self) -> Duration {
+        Duration::new(SETTINGS.archival_task.retry_interval, 0)
     }
 }
 
 impl StatusWatchTask {
     pub fn get_job_interval(&self) -> Duration {
         Duration::new(self.job_interval, 0)
+    }
+}
+
+impl CleanupTask {
+    pub fn get_job_interval(&self) -> Duration {
+        Duration::new(self.job_interval * 60, 0)
     }
 }

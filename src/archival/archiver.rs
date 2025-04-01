@@ -57,7 +57,7 @@ async fn process_url(conn: &PgPool, mut url: InternetArchiveUrl) -> Result<(), c
     info!("[Archiver] Processing url id `{}`", url.id);
 
     // We check if the url hasn't been retried multiple times already
-    if (url.try_count as u64) < SETTINGS.archival_task.max_retry {
+    if (url.try_count as i64) < SETTINGS.archival_task.max_retry {
         request_archiving(conn, &mut url).await?;
     } else {
         warn!(

@@ -4,13 +4,6 @@ error = true
 warning = true
 info = true
 
-[retry_task]
-# How long to wait between retries
-retry_interval = 86400 # 60*60*24 seconds
-select_limit  = 10 # TODO: Remove
-# Remove the row if it has been more than X elapsed seconds since its creation
-allow_remove_row_after = 86400
-
 [poller_task]
 poll_interval = 10
 
@@ -22,6 +15,10 @@ job_interval = 15
 worker_count = 1
 # The amount of times an url can be retried
 max_retry = 3
+# Remove the row if it has been more than X elapsed seconds since its creation
+allow_remove_row_after = 86400
+# How long to wait between url retries
+retry_interval = 86400 # 60*60*24 seconds
 
 # Watch over the pending archivals
 [status_watch_task]
@@ -31,6 +28,13 @@ job_interval = 15
 worker_count = 50
 # The amount of times the task can try fetching the url
 max_retry = 3
+# How long to wait between url retries
+retry_interval = 86400 # 60*60*24 seconds
+
+# Cleanup the database
+[cleaner_task]
+# The number of minutes between runs
+job_interval = 5
 
 [wayback_machine_api]
 save_endpoint_url = "http://web.archive.org/save"

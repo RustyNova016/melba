@@ -6,15 +6,17 @@ use tokio::task::JoinHandle;
 use crate::archival::archiver::run_archiver_task;
 use crate::archival::status_watcher::run_status_watcher;
 use crate::configuration::SETTINGS;
+use crate::database::cleanup::cleanup_task;
 use crate::poller::Poller;
 
 /// Start the archiving service
 pub async fn start(pool: &PgPool) -> Result<(), sqlx::Error> {
     // Start all the tasks
-    let (poll_result, archiver_result, status_watcher_result) = join!(
+    let (poll_result, archiver_result, status_watcher_result, cleanup_result) = join!(
         spawn_poller_task(pool.clone()).await,
         run_archiver_task(pool),
         run_status_watcher(pool),
+        cleanup_task(pool),
     );
 
     if let Err(e) = poll_result {
@@ -25,6 +27,9 @@ pub async fn start(pool: &PgPool) -> Result<(), sqlx::Error> {
     }
     if let Err(e) = status_watcher_result {
         error!("Listener task failed: {:?}", e);
+    }
+    if let Err(e) = cleanup_result {
+        error!("Cleaner task failed: {:?}", e);
     }
 
     Ok(())

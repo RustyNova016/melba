@@ -7,6 +7,7 @@ pub(crate) mod app;
 pub(crate) mod archival;
 pub(crate) mod cli;
 pub(crate) mod configuration;
+pub(crate) mod database;
 pub(crate) mod error;
 pub(crate) mod metrics;
 pub(crate) mod models;

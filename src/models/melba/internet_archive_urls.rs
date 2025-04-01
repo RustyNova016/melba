@@ -33,8 +33,11 @@ pub struct InternetArchiveUrl {
     pub id: i32,
     pub url: String,
     pub job_id: Option<String>,
+    #[allow(dead_code)]
     pub from_table: Option<String>,
+    #[allow(dead_code)]
     pub from_table_id: Option<i32>,
+    #[allow(dead_code)]
     pub created_at: DateTime<Utc>,
 
     pub status: ArchivalStatus,
@@ -49,7 +52,7 @@ pub struct InternetArchiveUrl {
 
 impl InternetArchiveUrl {
     /// Return true if a row with the provided row id is in the database
-    #[expect(dead_code)]
+    #[allow(dead_code)]
     pub async fn row_exist(conn: &PgPool, row_id: i32) -> Result<bool, sqlx::Error> {
         sqlx::query_scalar(
             "
@@ -75,12 +78,15 @@ impl InternetArchiveUrl {
                 WHERE 
                     (status = 'Waiting' OR status = 'Errored')
                     AND id > $1
-                    AND retry_after >= NOW()
-                ORDER BY id
+                    AND retry_after >= NOW() 
+                    AND created_at + make_interval(secs => $1) < NOW()
+                    AND try_count < $2
+                ORDER BY created_at
                 LIMIT 1
             ",
         )
         .bind(after_id.unwrap_or(0))
+        .bind(SETTINGS.archival_task.max_retry)
         .fetch_optional(conn)
         .await
     }
@@ -164,13 +170,13 @@ impl InternetArchiveUrl {
         )
         .bind(self.id)
         .bind(self.try_count + 1)
-        .bind(self.retry_after + SETTINGS.retry_task.get_retry_interval())
+        .bind(self.retry_after + SETTINGS.archival_task.get_retry_interval())
         .execute(conn)
         .await?;
 
         self.status = ArchivalStatus::Errored;
         self.try_count += 1;
-        self.retry_after += SETTINGS.retry_task.get_retry_interval();
+        self.retry_after += SETTINGS.archival_task.get_retry_interval();
 
         Ok(())
     }
@@ -187,7 +193,7 @@ impl InternetArchiveUrl {
         )
         .bind(self.id)
         .bind(self.try_count + 1)
-        .bind(self.retry_after + SETTINGS.retry_task.get_retry_interval())
+        .bind(self.retry_after + SETTINGS.archival_task.get_retry_interval())
         .execute(conn)
         .await?;
 
@@ -207,5 +213,59 @@ impl InternetArchiveUrl {
         )
         .fetch_all(conn)
         .await
+    }
+
+    /// Delete all the urls that are failed, and have passed the max wait for it
+    ///
+    /// This waits 30 seconds after the expiration date to make sure the job doesn't get picked up as it expires
+    pub async fn delete_errored_and_expired(conn: &PgPool) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            "
+            DELETE FROM external_url_archiver.internet_archive_urls
+            WHERE 
+                status = 'Errored' AND
+                created_at + make_interval(secs => $1 + 30) > NOW()
+        ",
+        )
+        .bind(SETTINGS.archival_task.allow_remove_row_after)
+        .execute(conn)
+        .await?;
+
+        Ok(())
+    }
+
+    /// Delete all the urls that are waiting to be picked up, and have passed the max wait for it
+    ///
+    /// This waits 30 seconds after the expiration date to make sure the job doesn't get picked up as it expires
+    pub async fn delete_waiting_and_expired(conn: &PgPool) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            "
+            DELETE FROM external_url_archiver.internet_archive_urls
+            WHERE 
+                status = 'Waiting' AND
+                created_at + make_interval(secs => $1 + 30) > NOW()
+        ",
+        )
+        .bind(SETTINGS.archival_task.allow_remove_row_after)
+        .execute(conn)
+        .await?;
+
+        Ok(())
+    }
+
+    /// Delete all the URLs that have been failed
+    pub async fn delete_failed(conn: &PgPool) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            "
+            DELETE FROM external_url_archiver.internet_archive_urls
+            WHERE 
+                status = 'Failed'
+        ",
+        )
+        .bind(SETTINGS.archival_task.allow_remove_row_after)
+        .execute(conn)
+        .await?;
+
+        Ok(())
     }
 }
